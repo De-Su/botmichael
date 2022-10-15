@@ -1,0 +1,10 @@
+﻿{
+  "profiles": {
+    "Local": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "BOT_ENVIRONMENT": "Local"
+      }
+    }
+  }
+}
