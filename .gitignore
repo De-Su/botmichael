@@ -247,4 +247,4 @@ _ReSharper*/
 *.nuget.props
 *.nuget.targets
 
-**/appsettings.Local.json
+appsettings.Local.json
