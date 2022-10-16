@@ -1,4 +1,5 @@
 ﻿using BotMichael.ConsoleApp;
+using BotMichael.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,20 +13,16 @@ IHostBuilder CreateHostBuilder() =>
         .ConfigureAppConfiguration((context, config) =>
         {
             var env = Environment.GetEnvironmentVariable("BOT_ENVIRONMENT");
-            config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-
-            if (!string.IsNullOrWhiteSpace(env) &&
-                File.Exists(Path.Combine(AppContext.BaseDirectory, $"appsettings.{env}.json")))
-            {
-                config.AddJsonFile($"appsettings.{env}.json", optional: true, reloadOnChange: true);
-            }
-
-            config.AddEnvironmentVariables();
+            config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{env}.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables();
         })
         .ConfigureServices((context, services) =>
         {
             services.AddOptions();
-            services.AddHostedService<Daemon>();
+            services.AddOptions<BotSettings>().Bind(context.Configuration.GetSection("BotSettings"));
+            services.AddHostedService<Worker>();
+            services.AddCoreServices();
         })
         .ConfigureLogging((context, logging) =>
         {
