@@ -1,36 +1,28 @@
-﻿using Microsoft.Extensions.Logging;
-using Telegram.Bot;
-using Telegram.Bot.Exceptions;
-using Telegram.Bot.Polling;
-using Telegram.Bot.Types;
-
-namespace BotMichael.Core;
+﻿namespace BotMichael.Application;
 
 public sealed class TelegramBotUpdateHandler : IUpdateHandler
 {
     private readonly ILogger<TelegramBotUpdateHandler> _logger;
+    private readonly HandlerFactory _factory;
 
-    public TelegramBotUpdateHandler(ILogger<TelegramBotUpdateHandler> logger)
+    public TelegramBotUpdateHandler(ILogger<TelegramBotUpdateHandler> logger, HandlerFactory factory)
     {
         _logger = logger;
+        _factory = factory;
     }
     
     public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Handling message...");
-        // Only process Message updates: https://core.telegram.org/bots/api#message
-        if (update.Message is not { } message)
+        if (BotSettings.ReceiverOptions!.AllowedUpdates!.All(x => x != update.Type))
+        {
+            _logger.LogError("Невозможно обработать сообщения {id} типа {type}", update.Id, update.Type.ToString());
             return;
-        // Only process text messages
-        if (message.Text is not { } messageText)
-            return;
-
-        var chatId = message.Chat.Id;
-
-        // Echo received message text
-        await botClient.SendTextMessageAsync(chatId, messageText, cancellationToken: cancellationToken);
+        }
+        
+        _logger.LogInformation("Обработка сообщения {id}", update.Id);
+        await _factory.Create(update.Type).Handle(botClient, update, cancellationToken);
     }
-
+    
     public Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
     {
         var errorMessage = exception switch

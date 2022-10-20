@@ -1,0 +1,9 @@
+﻿global using BotMichael.Application;
+global using BotMichael.Host.Workers;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.Extensions.Logging;
+global using Telegram.Bot;
+global using Telegram.Bot.Polling;
+global using Serilog;
