@@ -1,42 +1,53 @@
-﻿using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
-
-namespace BotMichael.Application.Handlers;
+﻿namespace BotMichael.Application.Handlers;
 
 public class MessageHandler : IHandler
 {
     public async Task Handle(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
     {
-        // var state = GetState(updateMessage.From);//inpure
-        // var reply = CreateReply(update, state);
-        // var newState = CreateNewState(user, reply);
-        // SaveState(newState);//inpure
-        // SendReply(reply); //inpure
-        
         var message = update.Message!;
+        var user = message.Chat.Id;
         
-        // Бот типа набирает текст 😁
-        await Task.Delay(500, cancellationToken);
-        await botClient.SendChatActionAsync(message.Chat.Id, ChatAction.Typing, cancellationToken);
+        var state = Db.GetState(user); //inpure
+        
+        var requestMessage = GetRequestMessage(state, message, user); //pure
+        var reply = requestMessage.CreateReply(); //pure
+        var newState = state.Next(reply); //pure
+        
+        Db.SaveState(user, newState); //inpure
+        await SendReply(botClient, reply, cancellationToken); //inpure
+    }
 
+    private async Task SendReply(ITelegramBotClient botClient, ReplyMessage reply, CancellationToken cancellationToken)
+    {
+        var sendText = (BaseContent content, CancellationToken token) => 
+            botClient.SendTextMessageAsync(content.UserId, ((TextContent)reply.Content).Text, cancellationToken: token);
+        
+        var task = reply switch
+        {
+            GetEmailReply => sendText(reply.Content, cancellationToken),
+            GetPasswordReply => sendText(reply.Content, cancellationToken),
+            ReadyReply => sendText(reply.Content, cancellationToken),
+            ErrorReply => sendText(reply.Content, cancellationToken),
+            _ => Task.CompletedTask
+        };
+
+        await task;
+    }
+
+    private RequestMessage GetRequestMessage(BaseState baseState, Message message, long userId)
+    {
         if (message.Text is { })
         {
-            if (message.Text!.Equals("/start", StringComparison.OrdinalIgnoreCase))
+            return baseState switch
             {
-                var buttons = Enumerable.Range(1, 2).Select(x =>
-                    InlineKeyboardButton.WithCallbackData(x.ToString(), $"command{x}"));
-
-                var inlineKeyboard = new InlineKeyboardMarkup(buttons);
-
-                await botClient.SendTextMessageAsync(
-                    message.Chat.Id,
-                    "Здарова, жми на кнопки",
-                    replyMarkup: inlineKeyboard,
-                    cancellationToken: cancellationToken);
-                return;
-            }
-            
-            await botClient.SendTextMessageAsync(message.Chat.Id, $"Отвечаю: {message.Text}", cancellationToken: cancellationToken);
+                InitialState => new StartRequest(userId),
+                WaitingEmailState => new SetEmailRequest(message.Text, userId),
+                WaitingPasswordState => new SetPasswordRequest(message.Text, userId),
+                ReadyState => new StartRequest(userId),
+                _ => throw new ArgumentOutOfRangeException(nameof(baseState)),
+            };
         }
+
+        return new StartRequest(userId);
     }
 }
