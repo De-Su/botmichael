@@ -1,53 +1,41 @@
-﻿namespace BotMichael.Application.Handlers;
+﻿using BotMichael.Domain.Event;
+using LanguageExt;
 
+namespace BotMichael.Application.Handlers;
+
+/// <summary>
+/// Обработчик сообщений для типа <see cref="Message"/>
+/// </summary>
 public class MessageHandler : IHandler
 {
-    public async Task Handle(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+    public async Task Handle(ITelegramBotClient botClient, Update update, CancellationToken token)
     {
-        var message = update.Message!;
-        var user = message.Chat.Id;
-        
-        var state = Db.GetState(user); //inpure
-        
-        var requestMessage = GetRequestMessage(state, message, user); //pure
-        var reply = requestMessage.CreateReply(); //pure
-        var newState = state.Next(reply); //pure
-        
-        Db.SaveState(user, newState); //inpure
-        await SendReply(botClient, reply, cancellationToken); //inpure
+        var user = update.Message!.Chat.Id;
+        var lastEvent = Db.GetLastEvent(user);
+        var request = GetRequestMessage(lastEvent, update.Message, user);
+        var reply = request.CreateReply();
+        var newEvent = lastEvent.CreateEventByReply(request, reply);
+        Db.SaveEvent(newEvent);
+        await SendReply(botClient, reply.Content, token);
     }
 
-    private async Task SendReply(ITelegramBotClient botClient, ReplyMessage reply, CancellationToken cancellationToken)
-    {
-        var sendText = (BaseContent content, CancellationToken token) => 
-            botClient.SendTextMessageAsync(content.UserId, ((TextContent)reply.Content).Text, cancellationToken: token);
-        
-        var task = reply switch
+    private static RequestMessage GetRequestMessage(Option<BaseEvent> lastEvent, Message message, long userId) =>
+        lastEvent
+            .Match<RequestMessage>(
+                ev =>
+                    ev switch
+                    {
+                        StartEvent => new SetEmailRequest(message.Text!, userId),
+                        SetEmailEvent => new SetPasswordRequest(message.Text!, userId),
+                        SetPasswordEvent => new StartRequest(userId),
+                        _ => throw new ArgumentOutOfRangeException(nameof(ev))
+                    },
+                () => new StartRequest(userId));
+
+    private static Task SendReply(ITelegramBotClient botClient, BaseContent content, CancellationToken token) =>
+        content switch
         {
-            GetEmailReply => sendText(reply.Content, cancellationToken),
-            GetPasswordReply => sendText(reply.Content, cancellationToken),
-            ReadyReply => sendText(reply.Content, cancellationToken),
-            ErrorReply => sendText(reply.Content, cancellationToken),
+            TextContent(var text, var userId) => botClient.SendTextMessageAsync(userId, text, cancellationToken: token),
             _ => Task.CompletedTask
         };
-
-        await task;
-    }
-
-    private RequestMessage GetRequestMessage(BaseState baseState, Message message, long userId)
-    {
-        if (message.Text is { })
-        {
-            return baseState switch
-            {
-                InitialState => new StartRequest(userId),
-                WaitingEmailState => new SetEmailRequest(message.Text, userId),
-                WaitingPasswordState => new SetPasswordRequest(message.Text, userId),
-                ReadyState => new StartRequest(userId),
-                _ => throw new ArgumentOutOfRangeException(nameof(baseState)),
-            };
-        }
-
-        return new StartRequest(userId);
-    }
 }

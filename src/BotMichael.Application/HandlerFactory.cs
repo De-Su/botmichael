@@ -4,6 +4,9 @@ using Telegram.Bot.Types.Enums;
 
 namespace BotMichael.Application;
 
+/// <summary>
+/// Фабрика обработчиков по типу сообщения
+/// </summary>
 public class HandlerFactory
 {
     private readonly IServiceProvider _serviceProvider;

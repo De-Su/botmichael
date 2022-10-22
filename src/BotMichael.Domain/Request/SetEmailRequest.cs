@@ -3,6 +3,10 @@ using BotMichael.Domain.Reply;
 
 namespace BotMichael.Domain.Request;
 
+/// <summary>
+/// Запрос на указание электронной почты
+/// </summary>
+/// <param name="Email">Электронная почта</param>
 public record SetEmailRequest(string Email, long UserId) : RequestMessage(UserId)
 {
     public override ReplyMessage CreateReply()

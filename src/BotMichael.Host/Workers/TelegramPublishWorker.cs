@@ -1,5 +1,8 @@
 ﻿namespace BotMichael.Host.Workers;
 
+/// <summary>
+/// Worker для публикации постов
+/// </summary>
 internal sealed class TelegramPublishWorker : BackgroundService
 {
     private readonly ILogger<TelegramPublishWorker> _logger;

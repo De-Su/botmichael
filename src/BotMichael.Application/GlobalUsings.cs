@@ -6,4 +6,3 @@ global using Telegram.Bot.Types;
 global using BotMichael.Domain.Content;
 global using BotMichael.Domain.Reply;
 global using BotMichael.Domain.Request;
-global using BotMichael.Domain.State;

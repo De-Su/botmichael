@@ -3,6 +3,10 @@ using BotMichael.Domain.Reply;
 
 namespace BotMichael.Domain.Request;
 
+/// <summary>
+/// Запрос на указание пароля
+/// </summary>
+/// <param name="Password">Пароль</param>
 public record SetPasswordRequest(string Password, long UserId) : RequestMessage(UserId)
 {
     public override ReplyMessage CreateReply()
