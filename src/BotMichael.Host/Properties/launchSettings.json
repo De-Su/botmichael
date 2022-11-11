@@ -1,9 +1,11 @@
 ﻿{
   "profiles": {
-    "Local": {
+    "BotMichael.Host": {
       "commandName": "Project",
+      "dotnetRunMessages": true,
       "environmentVariables": {
-        "BOT_ENVIRONMENT": "Local"
+        "DOTNET_ENVIRONMENT": "Development",
+        "BOT_TOKEN": "Здесь должен быть токен"
       }
     }
   }
