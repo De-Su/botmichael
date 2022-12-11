@@ -11,7 +11,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="DomainApi.fs" />
+        <Compile Include="Domain.fs" />
+        <Compile Include="ReplyContent.fs" />
         <Compile Include="Db.fs" />
         <Compile Include="Handler.fs" />
     </ItemGroup>

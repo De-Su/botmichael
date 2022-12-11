@@ -10,17 +10,24 @@ open Microsoft.Extensions.Logging
 
 type Worker(logger: ILogger<Worker>) =
     inherit BackgroundService()
-    
+
     override _.ExecuteAsync(ct: CancellationToken) =
         async {
-            let config = {Config.defaultConfig with Token = Environment.GetEnvironmentVariable("BOT_TOKEN")}
-            let! _ = Funogram.Telegram.Api.deleteWebhookBase () |> api config
+            let config =
+                { Config.defaultConfig with
+                    Token = Environment.GetEnvironmentVariable("BOT_TOKEN")
+                    AllowedUpdates = Some [| "message"; "callback_query" |] }
+
+            let! _ =
+                Funogram.Telegram.Api.deleteWebhookBase ()
+                |> api config
+
             let! me = Funogram.Telegram.Api.getMe |> api config
-            
+
             match me with
-            | Ok ok -> logger.LogInformation("Starting bot @{BotName}", ok.Username.Value)
+            | Ok ok -> logger.LogInformation("Starting bot @{BotName}", ok.Username |> Option.defaultValue "anonymous")
             | _ -> logger.LogError("Bot not started!")
-            
+
             return! startBot config Handler.updateArrived None
         }
         |> Async.StartAsTask

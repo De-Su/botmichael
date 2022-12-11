@@ -8,13 +8,7 @@ open Domain.User
 [<AbstractClass; Sealed>]
 type private Cache() =
     static member val DialogStates = ConcurrentDictionary<UserId, DialogState>()
-
-    static member val UserEmails =
-        ConcurrentDictionary<UserId, string>() //todo: type email
-
-    static member val UserCodes =
-        ConcurrentDictionary<UserId, string>() //todo: type code
-
+    static member val UserCodes = ConcurrentDictionary<UserId, string>()
     static member val Publications = ConcurrentDictionary<UserId, Publication.Publication>()
 
 let getDialogState userId =

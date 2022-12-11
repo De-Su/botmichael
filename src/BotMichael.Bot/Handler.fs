@@ -1,215 +1,160 @@
 ﻿module Handler
 
-open Domain
 open Domain.User
+open Domain.Parser
 open Domain.Dialog
-open Funogram.Telegram
-open Funogram.Telegram.Bot
-open Funogram.Telegram.Types
+open Domain.Publication
 open Funogram.Api
 
-let sendText userId msg config =
-    Req.SendMessage.Make(UserId.value userId, msg)
+let sendMessage req config =
+    req
     |> api config
     |> Async.RunSynchronously
     |> ignore
 
-let sendMarkup userId msg replyMarkup config =
-    Req.SendMessage.Make(UserId.value userId, msg, parseMode = ParseMode.Markdown, replyMarkup = replyMarkup)
-    |> api config
-    |> Async.RunSynchronously
-    |> ignore
+let errorReply userId = ReplyContent.defaultError userId
 
-let handleStart state (userId: UserId, msg: string option) =
-    let text =
+let getStartReply =
+    fun userId msg ->
         match msg with
-        | Some s when s = "/start" ->
-            state |> getNextState |> Db.saveDialogState userId
+        | Text cq when cq = "/start" ->
 
-            "Добро пожаловать! Укажите, пожалуйста, свою электронную почту"
-        | _ -> "Ожидалась команда /start"
+            ReplyContent.start userId
+        | _ -> errorReply userId
 
-    sendText userId text
-
-let handleEmail state (userId: UserId, msg: string option) =
-    let text =
+let getEmailReply saveCode =
+    fun userId msg ->
         match msg with
-        | Some s when s = "privet@poka.ru" ->
-            state |> getNextState |> Db.saveDialogState userId
+        | Text t when t = "privet@poka.ru" ->
 
-            //todo: generate code and send code to email
-            Db.saveUserCode userId "321"
+            "321" |> saveCode userId
+            // todo sent code to email
 
-            "На Вашу электронную почту был отправлен код. Укажите его"
-        | _ -> "Что-то пошло не так"
+            ReplyContent.setEmail userId
+        | _ -> errorReply userId
 
-    sendText userId text
-
-let handleCode state (userId: UserId, msg: string option) =
-    match msg with
-    | Some s when s = Db.getUserCode userId ->
-        state |> getNextState |> Db.saveDialogState userId
-
-        Db.dropUserCode userId
-
-        let markup =
-            [| [| InlineKeyboardButton.Create("Создать", callbackData = "/create_publication") |] |]
-            |> InlineKeyboardMarkup.Create
-            |> Markup.InlineKeyboardMarkup
-
-        sendMarkup userId "Отлично! Чтобы создать запись, нажмите на кнопку" markup
-    | _ -> sendText userId "Код неверный, попробуйте еще раз"
-
-let handleCreatePublication state (userId: UserId, msg: string option) =
-    let text =
+let getCodeReply getCode =
+    fun userId msg ->
         match msg with
-        | Some s when s = "/create_publication" ->
+        | Text t when t = getCode userId ->
 
-            Publication.getDefault
-            |> Db.savePublication userId
+            ReplyContent.setCode userId
+        | _ -> errorReply userId
 
-            state |> getNextState |> Db.saveDialogState userId
-
-            "Укажите раздел"
-        | _ -> "Что-то пошло не так"
-
-    sendText userId text
-
-let handlePart state (userId: UserId, msg: string option) =
-    let text =
+let getCreatePublicationReply savePub =
+    fun userId msg ->
         match msg with
-        | Some s when s <> "" ->
+        | CallbackQuery cq when cq = "/create_publication" ->
+            getDefault |> savePub userId
 
-            { Db.getPublication userId with
-                  Part = s }
-            |> Db.savePublication userId
+            ReplyContent.createPublication userId
+        | _ -> errorReply userId
 
-            state |> getNextState |> Db.saveDialogState userId
-
-            "Укажите тип"
-        | _ -> "Что-то пошло не так"
-
-    sendText userId text
-
-let handleType state (userId: UserId, msg: string option) =
-    let text =
+let getPartReply (getPub: UserId -> Publication) savePub =
+    fun userId msg ->
         match msg with
-        | Some s when s <> "" ->
+        | Text t when t <> "" ->
+            { getPub userId with Part = t } |> savePub userId
 
-            { Db.getPublication userId with
-                  Type = s }
-            |> Db.savePublication userId
+            ReplyContent.setPart userId
+        | _ -> errorReply userId
 
-            state |> getNextState |> Db.saveDialogState userId
-
-            "Укажите заголовок"
-        | _ -> "Что-то пошло не так"
-
-    sendText userId text
-
-let handleTitle state (userId: UserId, msg: string option) =
-    let text =
+let getTypeReply (getPub: UserId -> Publication) savePub =
+    fun userId msg ->
         match msg with
-        | Some s when s <> "" ->
+        | Text t when t <> "" ->
+            { getPub userId with Type = t } |> savePub userId
 
-            { Db.getPublication userId with
-                  Title = s }
-            |> Db.savePublication userId
+            ReplyContent.setType userId
+        | _ -> errorReply userId
 
-            state |> getNextState |> Db.saveDialogState userId
-
-            "Укажите хэштеги"
-        | _ -> "Что-то пошло не так"
-
-    sendText userId text
-
-let handleHashTags state (userId: UserId, msg: string option) =
-    let text =
+let getTitleReply (getPub: UserId -> Publication) savePub =
+    fun userId msg ->
         match msg with
-        | Some s when s <> "" ->
+        | Text t when t <> "" ->
+            { getPub userId with Title = t } |> savePub userId
 
-            { Db.getPublication userId with
-                  HashTags = s }
-            |> Db.savePublication userId
+            ReplyContent.setTitle userId
+        | _ -> errorReply userId
 
-            state |> getNextState |> Db.saveDialogState userId
-
-            "Укажите тело"
-        | _ -> "Что-то пошло не так"
-
-    sendText userId text
-
-let handleBody state (userId: UserId, msg: string option) =
-    let text =
+let getHashTagsReply (getPub: UserId -> Publication) savePub =
+    fun userId msg ->
         match msg with
-        | Some s when s <> "" ->
+        | Text t when t <> "" ->
+            { getPub userId with HashTags = t }
+            |> savePub userId
 
-            { Db.getPublication userId with
-                  Body = s }
-            |> Db.savePublication userId
+            ReplyContent.setHashTags userId
+        | _ -> errorReply userId
 
+let getBodyReply (getPub: UserId -> Publication) savePub =
+    fun userId msg ->
+        match msg with
+        | Text t when t <> "" ->
+            { getPub userId with Body = t } |> savePub userId
+
+            ReplyContent.setBody userId
+        | _ -> errorReply userId
+
+let getImageReply (getPub: UserId -> Publication) savePub =
+    fun userId msg ->
+        match msg with
+        | Photo p ->
+            { getPub userId with Images = string p }
+            |> savePub userId
+
+            ReplyContent.setImages userId
+        | _ -> errorReply userId
+
+let getPublishReply getPub dropPub publish =
+    fun userId msg ->
+        match msg with
+        | CallbackQuery cq when cq = "/publish" ->
+            
+            getPub userId
+            |> publish
+            
+            dropPub userId
+            ReplyContent.publish userId
+        | _ -> errorReply userId
+
+
+let flow state userId msg =
+    let getPub = Db.getPublication
+    let savePub = Db.savePublication
+    let dropPub = Db.dropPublication
+    let getCode = Db.getUserCode
+    let saveCode = Db.saveUserCode
+    let publish = fun (p: Publication) -> System.Console.WriteLine (string p)
+
+    let getReply =
+        match state with
+        | Start -> getStartReply
+        | WaitingEmail -> getEmailReply saveCode
+        | WaitingCode -> getCodeReply getCode
+        | WaitingCreatePublication -> getCreatePublicationReply savePub
+        | WaitingPart -> getPartReply getPub savePub
+        | WaitingPublicationType -> getTypeReply getPub savePub
+        | WaitingTitle -> getTitleReply getPub savePub
+        | WaitingHashTags -> getHashTagsReply getPub savePub
+        | WaitingBody -> getBodyReply getPub savePub
+        | WaitingImage -> getImageReply getPub savePub
+        | WaitingPublish -> getPublishReply getPub dropPub publish
+
+    getReply userId msg
+
+
+let updateArrived ctx =
+    match getUserId ctx, parse ctx with
+    | Some userId, Some msg ->
+        let state = userId |> Db.getDialogState
+
+        match flow state userId msg with
+        | Ok ok ->
             state |> getNextState |> Db.saveDialogState userId
+            sendMessage ok ctx.Config
+        | Error err ->
+            //log
+            sendMessage err ctx.Config
 
-            "Укажите изображения"
-        | _ -> "Что-то пошло не так"
-
-    sendText userId text
-
-let handleImage state (userId: UserId, msg: string option) =
-    match msg with
-    | Some s when s <> "" ->
-
-        { Db.getPublication userId with
-              Images = s }
-        |> Db.savePublication userId
-
-        state |> getNextState |> Db.saveDialogState userId
-
-        let markup =
-            [| [| InlineKeyboardButton.Create("Опубликовать", callbackData = "/publish") |] |]
-            |> InlineKeyboardMarkup.Create
-            |> Markup.InlineKeyboardMarkup
-
-        sendMarkup userId "Нажми на кнопку, чтобы опубликовать" markup
-    | _ -> sendText userId "Что-то пошло не так"
-
-let handlePublish state (userId: UserId, msg: string option) =
-    match msg with
-    | Some s when s = "/publish" ->
-
-        let p = string <| Db.getPublication userId
-        Db.dropPublication userId
-        state |> getNextState |> Db.saveDialogState userId
-
-        let markup =
-            [| [| InlineKeyboardButton.Create("Создать", callbackData = "/create_publication") |] |]
-            |> InlineKeyboardMarkup.Create
-            |> Markup.InlineKeyboardMarkup
-
-        sendMarkup userId $"Опубликовано!\n {p} \n  Чтобы создать новую запись, нажмите на кнопку" markup
-    | _ -> sendText userId "Что-то пошло не так"
-
-let updateArrived (ctx: UpdateContext) =
-    let (userId, msg) =
-        match (ctx.Update.Message, ctx.Update.CallbackQuery) with
-        | (Some m, _) -> UserId.create m.From.Value.Id, m.Text
-        | (_, Some c) -> UserId.create c.From.Id, c.Data
-        | _ -> UserId.create 0, None
-
-    let dialogState = Db.getDialogState userId
-
-    let handle =
-        match dialogState with
-        | Start -> handleStart
-        | WaitingEmail -> handleEmail
-        | WaitingCode -> handleCode
-        | WaitingCreatePublication -> handleCreatePublication
-        | WaitingPart -> handlePart
-        | WaitingPublicationType -> handleType
-        | WaitingTitle -> handleTitle
-        | WaitingHashTags -> handleHashTags
-        | WaitingBody -> handleBody
-        | WaitingImage -> handleImage
-        | WaitingPublish -> handlePublish
-
-    handle dialogState (userId, msg) ctx.Config
+    | _ -> () //log
